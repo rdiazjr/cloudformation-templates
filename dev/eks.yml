@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: EKS Cluster with EC2 Worker Nodes (t3.large)
+
+Resources:
+
+  # IAM Role for EKS Cluster
+  EKSClusterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: dev-ClusterRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: eks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+
+  # EKS Cluster
+  EKSCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name:  cluster
+      RoleArn: !GetAtt EKSClusterRole.Arn
+      ResourcesVpcConfig:
+        EndpointPublicAccess: false
+        EndpointPrivateAccess: true
+        SubnetIds:
+          - subnet-0fc83df370995900b
+          - subnet-0e15e8624090b7071
+        SecurityGroupIds:
+          - !ImportValue dev-web-sg
+
+Outputs:
+  ClusterName:
+    Value: !Ref EKSCluster
+    Export:
+      Name: !Sub "dev-ClusterName"
+
+  ClusterRole:
+    Value: !Ref EKSClusterRole
+    Export:
+      Name: !Sub "dev-ClusterRole"

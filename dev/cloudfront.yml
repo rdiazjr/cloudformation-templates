@@ -1,0 +1,29 @@
+  
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation Template for CloudFront
+  
+Resources:
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: 'true'
+        Origins:
+          - Id: S3Origin
+            DomainName: !ImportValue "dev-bucket-domain-name"
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          ForwardedValues:
+            QueryString: 'false'
+            Cookies:
+              Forward: all
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: 'true'
+     

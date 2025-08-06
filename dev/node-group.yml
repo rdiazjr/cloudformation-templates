@@ -1,0 +1,43 @@
+Resources:
+   # IAM Role for EC2 Nodes
+  NodeInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: test-NodeInstanceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPullOnly
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+
+
+  # Instance Profile for Worker Nodes
+  NodeInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref NodeInstanceRole
+
+
+  Nodegroup:
+    Type: 'AWS::EKS::Nodegroup'
+    Properties:
+      ClusterName: !ImportValue dev-ClusterName
+      NodegroupName: dev
+      AmiType: AL2023_x86_64_STANDARD
+      InstanceTypes:
+        - t3.large
+      NodeRole: !GetAtt NodeInstanceRole.Arn
+      ScalingConfig:
+        MinSize: 1
+        DesiredSize: 1
+        MaxSize: 1
+      Subnets:
+        - subnet-0fc83df370995900b
+        - subnet-0e15e8624090b7071

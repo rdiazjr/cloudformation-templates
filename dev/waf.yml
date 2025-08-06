@@ -1,0 +1,71 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: AWS CloudFormation WebACL
+
+Resources:
+  MainLoadBalancerWAF:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: dev-waf
+      Description:  DEV WAF
+      Scope: REGIONAL
+      DefaultAction:
+        Allow: {}
+      VisibilityConfig:
+        SampledRequestsEnabled: false
+        CloudWatchMetricsEnabled: true
+        MetricName: dev-waf
+      Rules:
+        - Name: AWS-AWSManagedRulesPHPRuleSet
+          Priority: 0
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: false
+            CloudWatchMetricsEnabled: true
+            MetricName:  dev-waf-AWSManagedRulesPHPRuleSet
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesPHPRuleSet
+        - Name: AWS-AWSManagedRulesSQLiRuleSet
+          Priority: 1
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: false
+            CloudWatchMetricsEnabled: true
+            MetricName: dev-AWS-AWSManagedRulesSQLiRuleSet
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesSQLiRuleSet
+        - Name: AWS-AWSManagedRulesLinuxRuleSet
+          Priority: 2
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: false
+            CloudWatchMetricsEnabled: true
+            MetricName: dev-AWS-AWSManagedRulesLinuxRuleSet
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesLinuxRuleSet
+      Tags:
+        - Key: Client
+          Value: 
+        - Key: Project
+          Value: Corporate Website
+        - Key: Environment
+          Value: Development
+        - Key: Created By
+          Value: rodiaz
+  
+  MainWAFAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn: !Sub
+        - arn:aws:elasticloadbalancing:ap-southeast-1:${AccountId}:loadbalancer/${LoadBalancerName}
+        - { AccountId: !Ref AWS::AccountId, LoadBalancerName: !ImportValue dev-alb-full-name }
+      WebACLArn: !GetAtt MainLoadBalancerWAF.Arn

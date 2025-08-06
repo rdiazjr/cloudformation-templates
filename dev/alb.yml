@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: AWS CloudFormation ALB
+
+Resources:
+  MainLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: test-alb
+      Type: application
+      IpAddressType: ipv4
+      LoadBalancerAttributes:
+        - Key: deletion_protection.enabled
+          Value: true
+        - Key: routing.http2.enabled
+          Value: true
+      SecurityGroups:
+        - !ImportValue test-web-sg
+      Subnets:
+        - !ImportValue public-subnet1a
+        - !ImportValue public-subnet1b
+
+Outputs:
+  MainLoadBalancerFullName:
+    Description: Main Load Balancer Name
+    Value: !GetAtt MainLoadBalancer.LoadBalancerFullName
+    Export:
+      Name: dev-alb-full-name
+
+  MainLoadBalancerDNS:
+    Description: Main Load Balancer DNS
+    Value: !GetAtt MainLoadBalancer.DNSName
+    Export:
+      Name: dev-alb-dns
+  

@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create ECR repositories for API, CMS, and Frontend
+
+Resources:
+  APIRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: api
+
+  CMSRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: cms
+
+
+  FrontEndRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: web
+
+Outputs:
+  APIRepositoryURI:
+    Description: URI of the API ECR repository
+    Value: !GetAtt APIRepository.RepositoryUri
+    Export:
+      Name: !Sub "${AWS::StackName}-APIRepositoryURI"
+
+  CMSRepositoryURI:
+    Description: URI of the CMS ECR repository
+    Value: !GetAtt CMSRepository.RepositoryUri
+    Export:
+      Name: !Sub "${AWS::StackName}-CMSRepositoryURI"
+
+  FERepositoryURI:
+    Description: URI of the Frontend ECR repository
+    Value: !GetAtt FrontEndRepository.RepositoryUri
+    Export:
+      Name: !Sub "${AWS::StackName}-FERepositoryURI"

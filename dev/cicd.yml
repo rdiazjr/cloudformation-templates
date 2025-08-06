@@ -1,0 +1,427 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: AWS CloudFormation Stack for CI/CD
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: Project Details
+        Parameters:
+          - Client
+          - ClientSlug
+          - Project
+          - ProjectSlug
+          - Environment
+          - CreatedBy
+      -
+        Label:
+          default: Github
+        Parameters:
+          - Repository
+          - BranchName
+          - CloneURL
+          - GithubConnection
+    ParameterLabels:
+      Client:
+        default: "Name of the Client"
+      ClientSlug:
+        default: "Slug name for the Client No spaces. Use - to connect words."
+      Project:
+        default: "Name of the Project"
+      ProjectSlug:
+        default: "Slug name for the Project No spaces. Use - to connect words."
+      Environment:
+        default: "Environment name (Development, UAT, Production)"
+      CreatedBy:
+        default: "DevOps Engineer IAM username"
+      Repository:
+        default: "Github repository"
+      Branch:
+        default: "Name of the branch from the repository"
+      CloneURL:
+        default: "HTTPS Clone URL"
+      GithubConnection:
+        default: "Developer Tools Connection ARN to Github"
+
+
+Parameters:
+  Client:
+    Type: String
+    Description: Client
+  ClientSlug:
+    Type: String
+    Description: Client Slug
+  Project:
+    Type: String
+    Description: Project
+  ProjectSlug:
+    Type: String
+    Description: Project Slug
+  Environment:
+    Type: String
+    Description: Environment
+    AllowedValues:
+      - Development
+      - UAT
+      - Production
+  CreatedBy:
+    Type: String
+    Description: Created By
+    AllowedValues:
+      - rogelio
+  Repository:
+    Type: String
+    Description: Repository Name
+  BranchName:
+    Type: String
+    Description: Branch Name
+  CloneURL:
+    Type: String
+    Description: Clone URL
+  GithubConnection:
+    Type: String
+    Description: Connection ARN
+
+Mappings:
+  EnvLowerCase:
+    Development:
+      Name: dev
+    UAT:
+      Name: uat
+    Production:
+      Name: production
+Resources:
+
+################################### IAM Role ###################################
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub
+        - "codebuild-${ClientSlug}-${ProjectSlug}-${EnvLowerCase}-role"
+        - EnvLowerCase: !FindInMap [EnvLowerCase, !Ref Environment, Name]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+      Policies:
+        - PolicyName: CodebuildBasePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub
+                    - "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ClientSlug}-${ProjectSlug}-${EnvLowerCase}"
+                    - EnvLowerCase: !FindInMap [EnvLowerCase, !Ref Environment, Name]
+                  - !Sub
+                    - "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ClientSlug}-${ProjectSlug}-${EnvLowerCase}:*"
+                    - EnvLowerCase: !FindInMap [EnvLowerCase, !Ref Environment, Name]
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:GetBucketAcl
+                  - s3:GetBucketLocation
+                Resource: !Sub "arn:aws:s3:::codepipeline-${AWS::Region}-*"
+              - Effect: Allow
+                Action:
+                  - codebuild:CreateReportGroup
+                  - codebuild:CreateReport
+                  - codebuild:UpdateReport
+                  - codebuild:BatchPutTestCases
+                  - codebuild:BatchPutCodeCoverages
+                Resource: !Sub
+                  - "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/${ClientSlug}-${ProjectSlug}-${EnvLowerCase}-*"
+                  - EnvLowerCase: !FindInMap [EnvLowerCase, !Ref Environment, Name]
+        - PolicyName: CodeBuildCloudWatchLogsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub
+                    - "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ClientSlug}-${ProjectSlug}-${EnvLowerCase}-codebuild-logs"
+                    - EnvLowerCase: !FindInMap [EnvLowerCase, !Ref Environment, Name]
+                  - !Sub
+                    - "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ClientSlug}-${ProjectSlug}-${EnvLowerCase}-codebuild-logs:*"
+                    - EnvLowerCase: !FindInMap [EnvLowerCase, !Ref Environment, Name]
+        - PolicyName: SSMGetParameter
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameters
+                  - ssm:GetParameter
+                Resource: '*'
+        - PolicyName: AllowECR
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource: "*"
+      Tags:
+        - Key: Client
+          Value: !Ref Client
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Created By
+          Value: !Ref CreatedBy
+
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub
+         - "codepipeline-${ClientSlug}-${ProjectSlug}-${EnvLowerCase}-role"
+         - EnvLowerCase: !FindInMap [EnvLowerCase, !Ref Environment, Name]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+      Policies:
+        - PolicyName: CodePipelinePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: '*'
+                Condition:
+                  StringEqualsIfExists:
+                    iam:PassedToService:
+                      - cloudformation.amazonaws.com
+                      - elasticbeanstalk.amazonaws.com
+                      - ec2.amazonaws.com
+                      - ecs-tasks.amazonaws.com
+              - Effect: Allow
+                Action:
+                  - codedeploy:CreateDeployment
+                  - codedeploy:GetApplication
+                  - codedeploy:GetApplicationRevision
+                  - codedeploy:GetDeployment
+                  - codedeploy:CreateDeployment
+                  - codedeploy:GetDeploymentConfig
+                  - codedeploy:RegisterApplicationRevision
+                Resource: '*'
+              - Effect: Allow
+                Action: codestar-connections:UseConnection
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - elasticbeanstalk:*
+                  - ec2:*
+                  - elasticloadbalancing:*
+                  - autoscaling:*
+                  - cloudwatch:*
+                  - s3:*
+                  - sns:*
+                  - cloudformation:*
+                  - rds:*
+                  - sqs:*
+                  - ecs:*
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                  - lambda:ListFunctions
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - opsworks:CreateDeployment
+                  - opsworks:DescribeApps
+                  - opsworks:DescribeCommands
+                  - opsworks:DescribeDeployments
+                  - opsworks:DescribeInstances
+                  - opsworks:DescribeStacks
+                  - opsworks:UpdateApp
+                  - opsworks:UpdateStack
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:UpdateStack
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:SetStackPolicy
+                  - cloudformation:ValidateTemplate
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - codebuild:BatchGetBuilds
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuildBatches
+                  - codebuild:StartBuildBatch
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - devicefarm:ListProjects
+                  - devicefarm:ListDevicePools
+                  - devicefarm:GetRun
+                  - devicefarm:GetUpload
+                  - devicefarm:CreateUpload
+                  - devicefarm:ScheduleRun
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - servicecatalog:ListProvisioningArtifacts
+                  - servicecatalog:CreateProvisioningArtifact
+                  - servicecatalog:DescribeProvisioningArtifact
+                  - servicecatalog:DeleteProvisioningArtifact
+                  - servicecatalog:UpdateProduct
+                Resource: '*'
+              - Effect: Allow
+                Action: cloudformation:ValidateTemplate
+                Resource: '*'
+              - Effect: Allow
+                Action: ecr:DescribeImages
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - states:DescribeExecution
+                  - states:DescribeStateMachine
+                  - states:StartExecution
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - appconfig:StartDeployment
+                  - appconfig:StopDeployment
+                  - appconfig:GetDeployment
+                Resource: '*'
+      Tags:
+        - Key: Client
+          Value: !Ref Client
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Created By
+          Value: !Ref CreatedBy
+
+################################### CodeBuild ###################################
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub
+        - "${ClientSlug}-${ProjectSlug}-${EnvLowerCase}"
+        - EnvLowerCase: !FindInMap [EnvLowerCase, !Ref Environment, Name]
+      Description: !Sub "${ClientSlug} ${ProjectSlug} ${Environment}"
+      ServiceRole: !Ref CodeBuildRole
+      SourceVersion: !Sub "refs/heads/${BranchName}"
+      Artifacts:
+        Type: no_artifacts
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:5.0
+      Source:
+        Type: GITHUB
+        Location: !Ref CloneURL
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Sub 
+            - "${ClientSlug}-${ProjectSlug}-${EnvLowerCase}-codebuild-logs"
+            - EnvLowerCase: !FindInMap [EnvLowerCase, !Ref Environment, Name]
+          Status: ENABLED
+      Tags:
+        - Key: Client
+          Value: !Ref Client
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Created By
+          Value: !Ref CreatedBy
+
+################################### CodePipeline ###################################
+
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub
+        - "${ClientSlug}-${ProjectSlug}-${EnvLowerCase}"
+        - EnvLowerCase: !FindInMap [EnvLowerCase, !Ref Environment, Name]
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      ArtifactStores:
+        - Region: !Ref AWS::Region
+          ArtifactStore:
+            Type: S3
+            Location: !Sub "codepipeline-${AWS::Region}-${AWS::AccountId}"
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeStarSourceConnection
+              Configuration:
+                ConnectionArn: !Ref GithubConnection
+                FullRepositoryId: !Sub
+                  - "Foodgroup-IT/${Repository}"
+                  - Repository: !Ref Repository
+                BranchName: !Ref BranchName
+              OutputArtifacts:
+                - Name: !Sub 
+                  - "${ClientSlug}-${ProjectSlug}-${EnvLowerCase}-source"
+                  - EnvLowerCase: !FindInMap [EnvLowerCase, !Ref Environment, Name]
+        - Name: Build
+          Actions:
+            - Name: Build
+              InputArtifacts:
+                - Name: !Sub
+                  - "${ClientSlug}-${ProjectSlug}-${EnvLowerCase}-source"
+                  - EnvLowerCase: !FindInMap [EnvLowerCase, !Ref Environment, Name]
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              OutputArtifacts:
+                - Name: !Sub
+                  - ${ClientSlug}-${ProjectSlug}-${EnvLowerCase}-build
+                  - EnvLowerCase: !FindInMap [EnvLowerCase, !Ref Environment, Name]
+        
+      Tags:
+        - Key: Client
+          Value: !Ref Client
+        - Key: Project
+          Value: !Ref Project
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Created By
+          Value: !Ref CreatedBy

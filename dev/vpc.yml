@@ -1,0 +1,266 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Cloudformation template for Creating VPC
+
+Parameters:
+  MainVPC:
+    Type: AWS::EC2::VPC::Id
+    Description: The ID of the existing VPC
+    Default: vpc-41d8d223
+  
+  PublicSubnet1a:
+    Type: AWS::EC2::Subnet::Id
+    Description: The ID of the existing public subnet in availability zone ap-southeast-1a
+    Default: subnet-03312e161959319d4
+
+  PublicSubnet1b:
+    Type: AWS::EC2::Subnet::Id
+    Description: The ID of the existing public subnet in availability zone ap-southeast-1b
+    Default: subnet-0b3c8997eb5cb09b4
+
+Resources:
+
+  # Internet Gateway
+  # MainIGW:
+  #   Type: 'AWS::EC2::InternetGateway'
+  #   Properties:
+  #     Tags:
+  #       - Key: Name
+  #         Value:  | Website | DEV | Main | IGW
+  #       - Key: Client
+  #         Value: 
+  #       - Key: Project
+  #         Value: Corporate Website
+  #       - Key: Environment
+  #         Value: Development
+  #       - Key: Created By
+  #         Value: rodiaz
+
+  # # Attach the Internet Gateway to the VPC
+  # AttachInternetGateway:
+  #   Type: 'AWS::EC2::VPCGatewayAttachment'
+  #   Properties:
+  #     VpcId: !Ref MainVPC
+  #     InternetGatewayId: !Ref MainIGW
+
+  # Security Group
+  WebSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Allow HTTPS and HTTP traffic'
+      VpcId: !Ref MainVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0   # Change this to secured IP range for actual use
+          # SourcePrefixListId: 'pl-07bd60cbdf4eefd4e'
+
+        - IpProtocol: 'tcp'
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0  # Change this to secured IP range for actual use
+          # SourcePrefixListId: 'pl-07bd60cbdf4eefd4e'
+
+  # Create Route Table for Public Subnet
+  # PublicRouteTable:
+  #   Type: 'AWS::EC2::RouteTable'
+  #   Properties:
+  #     VpcId: !Ref MainVPC
+
+  # Create a route to the Internet Gateway in the Route Table
+  # PublicRoute:
+  #   Type: 'AWS::EC2::Route'
+  #   Properties:
+  #     RouteTableId: !Ref PublicRouteTable
+  #     DestinationCidrBlock: '0.0.0.0/0'  # Route for all internet traffic
+  #     GatewayId: !Ref MainIGW
+
+  # Associate Public Route Table with the Subnet
+  # PublicRoute1aTableAssociation:
+  #   Type: 'AWS::EC2::SubnetRouteTableAssociation'
+  #   Properties:
+  #     SubnetId: !Ref PublicSubnet1a
+  #     RouteTableId: !Ref PublicRouteTable
+
+  # PublicRoute1bTableAssociation:
+  #   Type: 'AWS::EC2::SubnetRouteTableAssociation'
+  #   Properties:
+  #     SubnetId: !Ref PublicSubnet1b
+  #     RouteTableId: !Ref PublicRouteTable
+
+  SQLSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow access from Main and Admin Security group
+      GroupName: dev-mysql-sg
+      VpcId: !Ref MainVPC
+      SecurityGroupIngress:
+        - Description: Web Security Group
+          IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref WebSecurityGroup
+      Tags:
+        - Key: Name
+          Value:  | Website | DEV | Main | SQL SG
+        - Key: Client
+          Value: 
+        - Key: Project
+          Value: Corporate Website
+        - Key: Environment
+          Value: Development
+        - Key: Created By
+          Value: rodiaz
+
+  # Private Subnet in ap-southeast-1a
+  # PrivateSubnetA:
+  #   Type: AWS::EC2::Subnet
+  #   Properties:
+  #     VpcId: !Ref MainVPC
+  #     CidrBlock: "172.28.88.0/24"
+  #     AvailabilityZone: "ap-southeast-1a"
+  #     MapPublicIpOnLaunch: false
+  #     Tags:
+  #       - Key: Name
+  #         Value:  | Website | DEV | Main | PrivateSubnetB
+  #       - Key: Client
+  #         Value: 
+  #       - Key: Project
+  #         Value: Corporate Website
+  #       - Key: Environment
+  #         Value: Development
+  #       - Key: Created By
+  #         Value: rodiaz
+
+  # Private Subnet in ap-southeast-1b
+  # PrivateSubnetB:
+  #   Type: AWS::EC2::Subnet
+  #   Properties:
+  #     VpcId: !Ref MainVPC
+  #     CidrBlock: "172.28.89.0/24"
+  #     AvailabilityZone: "ap-southeast-1b"
+  #     MapPublicIpOnLaunch: false
+  #     Tags:
+  #       - Key: Name
+  #         Value:  | Website | DEV | Main | PrivateSubnetB
+  #       - Key: Client
+  #         Value: 
+  #       - Key: Project
+  #         Value: Corporate Website
+  #       - Key: Environment
+  #         Value: Development
+  #       - Key: Created By
+  #         Value: rodiaz
+
+  # Private Route Table
+  # PrivateRouteTable:
+  #   Type: AWS::EC2::RouteTable
+  #   Properties:
+  #     VpcId: !Ref MainVPC
+  #     Tags:
+  #       - Key: Name
+  #         Value:  | Website | DEV | Main | Private Route Table
+  #       - Key: Client
+  #         Value: 
+  #       - Key: Project
+  #         Value: Corporate Website
+  #       - Key: Environment
+  #         Value: Development
+  #       - Key: Created By
+  #         Value: rodiaz
+
+  # # Route Table Association for Private Subnet A
+  # PrivateSubnetAAssociation:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation
+  #   Properties:
+  #     SubnetId: !Ref PrivateSubnetA
+  #     RouteTableId: !Ref PrivateRouteTable
+
+  # # Route Table Association for Private Subnet B
+  # PrivateSubnetBAssociation:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation
+  #   Properties:
+  #     SubnetId: !Ref PrivateSubnetB
+  #     RouteTableId: !Ref PrivateRouteTable
+
+  # Elastic IP for NAT Gateway
+  # NatEIP:
+  #   Type: AWS::EC2::EIP
+  #   DependsOn: AttachInternetGateway
+  #   Properties:iam
+  #     Domain: vpc
+  #     Tags:
+  #       - Key: Name
+  #         Value:  | Website | DEV | Main | NAT EIP
+  #       - Key: Environment
+  #         Value: Development
+  #       - Key: Created By
+  #         Value: rodiaz
+
+  # # NAT Gateway
+  # NatGateway:
+  #   Type: AWS::EC2::NatGateway
+  #   DependsOn: AttachInternetGateway
+  #   Properties:
+  #     AllocationId: !GetAtt NatEIP.AllocationId
+  #     SubnetId: !Ref PublicSubnet1a
+  #     Tags:
+  #       - Key: Name
+  #         Value:  | Website | DEV | Main | NAT Gateway
+  #       - Key: Environment
+  #         Value: Development
+  #       - Key: Created By
+  #         Value: rodiaz
+
+  # # Route from private route table to NAT Gateway
+  # PrivateRoute:
+  #   Type: AWS::EC2::Route
+  #   Properties:
+  #     RouteTableId: !Ref PrivateRouteTable
+  #     DestinationCidrBlock: 0.0.0.0/0
+  #     NatGatewayId: !Ref NatGateway
+
+
+Outputs:
+
+  VPCID:
+    Description: "The ID of the created VPC"
+    Value: !Ref MainVPC
+    Export:
+      Name: dev-vpc
+  
+  PublicSubnet1aID:
+    Description: "The ID of the created subnet"
+    Value: !Ref PublicSubnet1a
+    Export:
+      Name: dev-public-subnet1a
+
+  PublicSubnet1bID:
+    Description: "The ID of the created subnet"
+    Value: !Ref PublicSubnet1b
+    Export:
+      Name: dev-public-subnet1b
+
+  # PrivateSubnetAId:
+  #   Description: "The ID of the created subnet"
+  #   Value: !Ref PrivateSubnetA
+  #   Export:
+  #     Name: dev-private-subnet1a
+  
+  # PrivateSubnetBId:
+  #   Description: "The ID of the created subnet"
+  #   Value: !Ref PrivateSubnetB
+  #   Export:
+  #     Name: dev-private-subnet1b
+
+  WebsiteSecurityGroupID:
+    Description: "The ID of the created security group"
+    Value: !Ref WebSecurityGroup
+    Export:
+      Name: dev-web-sg
+  
+  SQLSecurityGroupID:
+    Description: "The ID of the created security group"
+    Value: !Ref SQLSecurityGroup
+    Export:
+      Name: dev-sql-sg

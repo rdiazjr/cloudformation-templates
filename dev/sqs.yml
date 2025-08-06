@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: AWS CloudFormation for SQS Queue
+
+Resources:
+  
+  Queue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: dev-queue
+      KmsMasterKeyId: alias/aws/sqs
+      Tags:
+        - Key: Client
+          Value: 
+        - Key: Project
+          Value: Corporate Website
+        - Key: Environment
+          Value: Development
+        - Key: Created By
+          Value: rodiaz
+
+  IAMUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: dev-sqs
+      Policies:
+        - PolicyName: SQSPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Resource: !GetAtt Queue.Arn
+                Action:
+                  - sqs:DeleteMessage
+                  - sqs:PurgeQueue
+                  - sqs:ReceiveMessage
+                  - sqs:SendMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:SetQueueAttributes
+      Tags:
+          - Key: Client
+            Value: 
+          - Key: Project
+            Value: Corporate Website
+          - Key: Environment
+            Value: Development
+          - Key: Created By
+            Value: rodiaz
+
+  QueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Resource: !GetAtt Queue.Arn
+            Action:
+              - sqs:DeleteMessage
+              - sqs:PurgeQueue
+              - sqs:ReceiveMessage
+              - sqs:SendMessage
+              - sqs:GetQueueAttributes
+              - sqs:SetQueueAttributes
+            Principal:
+              AWS: !GetAtt IAMUser.Arn
+      Queues:
+        - !Ref Queue

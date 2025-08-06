@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: AWS CloudFormation RDS
+
+Resources:
+  RDSInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: 20
+      AvailabilityZone: ap-southeast-1a
+      BackupRetentionPeriod: 7
+      CopyTagsToSnapshot: true
+      DBInstanceClass: db.t3.small
+      DBInstanceIdentifier: dev
+      DBSubnetGroupName: !Ref RDSSubnetGroup
+      DeletionProtection: true
+      Engine: mysql
+      EngineVersion: 8.0.32
+      MasterUsername: !Join ['', ['{{resolve:secretsmanager:', !Ref Secret, ':SecretString:username}}' ]]
+      MasterUserPassword: !Join ['', ['{{resolve:secretsmanager:', !Ref Secret, ':SecretString:password}}' ]]
+      PreferredBackupWindow: "19:30-20:30"
+      PreferredMaintenanceWindow: "Sat:18:00-Sat:19:00"
+      StorageEncrypted: true
+      StorageType: "gp3"
+      VPCSecurityGroups:
+        - !ImportValue dev-sql-sg
+      Tags:
+        - Key: Client
+          Value: 
+        - Key: Project
+          Value: Corporate Website
+        - Key: Environment
+          Value: Development
+        - Key: Created By
+          Value: rodiaz
+
+  RDSSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Allow access from Main and Admin Security group
+      DBSubnetGroupName: dev-subnet-group
+      SubnetIds:
+        - subnet-0fc83df370995900b
+        - subnet-0e15e8624090b7071
+      Tags:
+        - Key: Client
+          Value:  
+        - Key: Project
+          Value: Corporate Website
+        - Key: Environment
+          Value: Development
+        - Key: Created By
+          Value: rodiaz
+
+  Secret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: RDS secrets
+      Name: dev
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "root", "db_name": "tokyo_tokyo_dev"}'
+        GenerateStringKey: password
+        PasswordLength: 30
+        ExcludeCharacters: '"@/\'
+      Tags:
+        - Key: Client
+          Value: 
+        - Key: Project
+          Value: Corporate Website
+        - Key: Environment
+          Value: Development
+        - Key: Created By
+          Value: rodiaz
+
+  SecretAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref Secret
+      TargetId: !Ref RDSInstance
+      TargetType: AWS::RDS::DBInstance

@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: AWS CloudFormation S3
+
+###### Note: Replace value for all ecnclosed with <> #####
+
+Resources:
+  MainBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: t2-dev-bucket
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: "AES256"
+      Tags:
+        - Key: Client
+          Value: Tokto Tokyo
+        - Key: Project
+          Value: Corporate Website
+        - Key: Environment
+          Value: Development
+        - Key: Created By
+          Value: rodiaz
+
+  BucketIAMUser:
+    DependsOn: MainBucket
+    Type: AWS::IAM::User
+    Properties:
+      UserName: DevUser
+      Policies:
+        - PolicyName: s3-bucket-access
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt MainBucket.Arn
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                  - s3:GetObject
+                  - s3:GetObjectAcl
+                  - s3:DeleteObject
+                Resource: !Sub
+                  - "${ARN}/*"
+                  - ARN: !GetAtt MainBucket.Arn
+      Tags:
+        - Key: Client
+          Value: 
+        - Key: Project
+          Value: Corporate Website
+        - Key: Environment
+          Value: Development
+        - Key: Created By
+          Value: rodiaz
+
+  BucketPolicy:
+    DependsOn: [MainBucket, BucketIAMUser]
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref MainBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: s3:ListBucket
+            Resource: !GetAtt MainBucket.Arn
+            Principal:
+              AWS: !GetAtt BucketIAMUser.Arn
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:PutObjectAcl
+              - s3:GetObject
+              - s3:GetObjectAcl
+              - s3:DeleteObject
+            Resource: !Sub
+              - "${ARN}/*"
+              - ARN: !GetAtt MainBucket.Arn
+            Principal:
+              AWS: !GetAtt BucketIAMUser.Arn
+
+Outputs:
+  BucketDomainName:
+    Description: "S3 Bucket Domain Name"
+    Value: !GetAtt MainBucket.DomainName
+    Export:
+      Name: dev-bucket-domain-name
