@@ -1,0 +1,47 @@
+webVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-deployment
+  namespace: web-dev-environment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-dev
+  template:
+    metadata:
+      labels:
+        app: web-dev
+    spec:
+      containers:
+        - name: web-dev
+          image: <Account_Name>.dkr.ecr.ap-southeast-1.amazonaws.com/<Repository_Name>:<tag>
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          volumeMounts:
+            - name: web-env-volume
+              mountPath: /var/www/html/.env
+              subPath: .env
+      volumes:
+        - name: web-env-volume
+          configMap:
+            name: web-dev-config
+            items:
+              - key: .env
+                path: .env
+---
+webVersion: v1
+kind: Service
+metadata:
+  name: web-dev-service
+  namespace: t2-dev-environment
+spec:
+  selector:
+    app: web-dev
+  ports:
+    - name: laravel
+      protocol: TCP
+      port: 8000
+      targetPort: 90
+  type: NodePort
